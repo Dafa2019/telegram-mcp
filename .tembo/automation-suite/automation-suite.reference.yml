@@ -1,0 +1,94 @@
+version: "2026.3"
+
+metadata:
+  organization: "Dafa2019"
+  repository: "telegram-mcp"
+  timezone: "Asia/Singapore"
+  note: "Reference blueprint only. Configure actual automations in Tembo UI."
+
+policies:
+  default_branch: "main"
+  protected_authors:
+    - tembo-bot
+    - github-actions[bot]
+  rollout_mode: safe-first
+
+automations:
+  pr-review:
+    enabled: true
+    risk_level: low
+    trigger:
+      type: event
+      source: github
+      event: pull_request_opened
+    execution:
+      agent: codex
+      model: gpt-5.4
+      sandbox: docker
+      mode: review_only
+    notify:
+      slack_channel: "#engineering"
+
+  daily-slack-changelog:
+    enabled: true
+    risk_level: low
+    trigger:
+      type: schedule
+      cron: "0 18 * * 1-5"
+      timezone: "Asia/Singapore"
+    execution:
+      agent: opencode
+      model: gpt-5.4-mini
+      sandbox: docker
+    notify:
+      slack_channel: "#engineering"
+
+  security-scan:
+    enabled: false
+    risk_level: medium
+    trigger:
+      type: schedule
+      cron: "0 9 * * 1"
+      timezone: "Asia/Singapore"
+    execution:
+      agent: claudeCode
+      model: claude-opus-4-6
+      sandbox: vm
+    notify:
+      slack_channel: "#security-alerts"
+
+  auto-fix-ci:
+    enabled: false
+    risk_level: medium
+    trigger:
+      type: event
+      source: github
+      event: workflow_run_failed
+    execution:
+      agent: codex
+      model: gpt-5.3-codex
+      sandbox: docker
+      max_retries: 2
+    filters:
+      exclude_authors:
+        - tembo-bot
+        - github-actions[bot]
+
+  sentry-auto-fix:
+    enabled: false
+    risk_level: high
+    trigger:
+      type: webhook
+      source: sentry
+      event: new_issue
+      project: "telegram-mcp"
+    execution:
+      agent: claudeCode
+      model: claude-opus-4-6
+      sandbox: vm
+      timeout_minutes: 30
+    filters:
+      environment: production
+      min_level: error
+    notify:
+      slack_channel: "#engineering"
